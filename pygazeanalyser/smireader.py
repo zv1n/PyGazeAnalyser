@@ -89,6 +89,18 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
   data    - a list with a dict for every trial (see above)
   """
 
+  # variables
+  data = []
+  fixs = [{}, {}]
+  sacs = [{}, {}]
+  blks = [{}, {}]
+  events = {'Efix':[],'Esac':[],'Eblk':[],'msg':[]}
+  starttime = None
+  started = False
+  trialend = False
+  trial_id = None
+  content = False
+
   # # # # #
   # debug mode
 
@@ -125,7 +137,7 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
       if lines[0].keys() == lines[1].keys():
         message('Lists are now equal.')
 
-  def process_fixation(ag_mode, lines):
+  def process_fixation(mode, lr):
     """
     Table Header for Fixations:
     EventType, Trial, Number, Start, End, Duration, LocX, LocY,
@@ -136,13 +148,49 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
     Fixation L  1 14  3382450806427 3382450965523 159096  996.68  569.56  22  69  -1  17.16 17.16
     """
 
-    normalize(lines)
-    left = lines[0]
-    right = lines[1]
+    normalize(lr)
+    left = lr[0]
+    right = lr[1]
 
-    return []
+    keys = sorted(left.keys())
 
-  def process_saccade(ag_mode, lines):
+    result = []
+    for key in keys:
+      l = left[key]
+      r = right[key]
+
+      if mode == SMIModes.AVERAGE or mode is None:
+        if l is None:
+          result.append(r[3:8])
+        elif r is None:
+          result.append(l[3:8])
+        else:
+          result.append([l[3], l[4], (l[5] + r[5])/2, (l[6] + r[6])/2,
+                        (l[7] + r[7])/2])
+
+      elif mode == SMIModes.LEFT_ONLY:
+        if l is None:
+          continue
+
+        result.append(l[3:8])
+
+      elif mode == SMIModes.RIGHT_ONLY:
+        if r is None:
+          continue
+
+        result.append(r[3:8])
+
+      elif mode == SMIModes.STRICT_AVERAGE:
+        if l is None or r is None:
+          continue
+
+        result.append([l[3], l[4], (l[5] + r[5])/2, (l[6] + r[6])/2,
+                       (l[7] + r[7])/2])
+
+    return result
+
+
+  def process_saccade(mode, lr):
     """
     Table Header for Saccades:
     EventType, Trial, Number, Start, End, Duration, StartLocX, StartLocY,
@@ -154,13 +202,48 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
     Saccade L 1 13  3382450786556 3382450806427 19871 1009.68 587.24  1000.98 583.28  0.11  9.00  1.00  5.74  94.46 -203.67 137.37
     """
 
-    normalize(lines)
-    left = lines[0]
-    right = lines[1]
+    normalize(lr)
+    left = lr[0]
+    right = lr[1]
 
-    return []
+    keys = sorted(left.keys())
 
-  def process_blink(ag_mode, lines):
+    result = []
+    for key in keys:
+      l = left[key]
+      r = right[key]
+
+      if mode == SMIModes.AVERAGE or mode is None:
+        if l is None:
+          result.append(r[3:10])
+        elif r is None:
+          result.append(l[3:10])
+        else:
+          result.append([l[3], l[4], l[5], (l[6] + r[6])/2, (l[7] + r[7])/2,
+                        (l[8] + r[8])/2, (l[9] + r[9])/2])
+
+      elif mode == SMIModes.LEFT_ONLY:
+        if l is None:
+          continue
+
+        result.append(l[3:10])
+
+      elif mode == SMIModes.RIGHT_ONLY:
+        if r is None:
+          continue
+
+        result.append(r[3:10])
+
+      elif mode == SMIModes.STRICT_AVERAGE:
+        if l is None or r is None:
+          continue
+
+        result.append([l[3], l[4], l[5], (l[6] + r[6])/2, (l[7] + r[7])/2,
+                      (l[8] + r[8])/2, (l[9] + r[9])/2])
+    return result
+
+
+  def process_blink(mode, lr):
     """
     Table Header for Blinks:
     EventType, Trial, Number, Start, End, Duration
@@ -170,19 +253,33 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
     Blink L 1 1 3382451084874 3382451164475 79601
     """
 
-    normalize(lines)
-    left = lines[0]
-    right = lines[1]
+    normalize(lr)
+    left = lr[0]
+    right = lr[1]
 
-    return []
+    keys = sorted(left.keys())
 
-  def append_line(line, list):
-    if re.match(r'.*L$', line[0]):
-      list[0][line[2]] = line
+    result = []
+    for key in keys:
+      l = left[key]
+      r = right[key]
+
+      if l is None:
+        result.append(r[3:6])
+      elif r is None:
+        result.append(l[3:6])
+      else:
+        continue
+
+    return result
+
+  def append_line(ln, lst):
+    if re.match(r'.*L$', ln[0]):
+      lst[0][ln[2]] = ln
     elif re.match(r'.*R$', line[0]):
-      list[1][line[2]] = line
+      lst[1][ln[2]] = ln
     else:
-      message('Uknown fixation ident. "%s"' % re.match(r' L', line[0]))
+      message('Uknown fixation ident. "%s"' % re.match(r' L', ln[0]))
 
   # # # # #
   # file handling
@@ -203,21 +300,6 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
   # close file
   message("closing file '%s'" % filename)
   f.close()
-
-  # # # # #
-  # parse lines
-
-  # variables
-  data = []
-  fixs = [{}, {}]
-  sacs = [{}, {}]
-  blks = [{}, {}]
-  events = {'Efix':[],'Esac':[],'Eblk':[],'msg':[]}
-  starttime = None
-  started = False
-  trialend = False
-  trial_id = None
-  content = False
 
   # loop through all lines
   for i in range(len(raw)):
@@ -252,7 +334,7 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
 
         events['Efix'] = process_fixation(ag_mode, fixs)
         events['Esac'] = process_saccade(ag_mode, sacs)
-        events['Eblk'] = process_fixation(ag_mode, blks)
+        events['Eblk'] = process_blink(ag_mode, blks)
 
         # trial dict
         trial = {}
@@ -280,6 +362,10 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
         started = True
         starttime = int(line[2])
 
+    line[3] = int(line[3]) - starttime
+    line[4] = int(line[4]) - starttime
+    line[5] = int(line[5])
+
     # # # # #
     # parse line
 
@@ -301,11 +387,11 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
         try:
           event_type = line[0]
           m = None
-          if re.match(r'^Fixation', event_type) is None:
+          if re.match(r'^Fixation.*', event_type) is not None:
             append_line(line, fixs)
-          elif re.match(r'^Saccade', event_type) is None:
+          elif re.match(r'^Saccade.*', event_type) is not None:
             append_line(line, sacs)
-          elif re.match(r'^Blink', event_type) is None:
+          elif re.match(r'^Blink.*', event_type) is not None:
             append_line(line, blks)
         except Exception as e:
           message("line '%s' could not be parsed: %s" % (line, e))
@@ -318,7 +404,6 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
 
 # DEBUG #
 if __name__ == "__main__":
-  data = read_smioutput('events.txt', 1, stop=4, ag_mode=SMIModes.LEFT_ONLY, debug=True)
-
-  print data
+  data = read_smioutput('events.txt', 1, stop=5, ag_mode=SMIModes.RIGHT_ONLY, debug=False)
+  print data[0]['events']['Efix']
 # # # # #
