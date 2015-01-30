@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # analysis script for natural viewing experiment
 #
 # version 1 (1 Mar 2014)
@@ -8,7 +9,7 @@ __author__ = "Edwin Dalmaijer"
 import os
 
 # custom
-from pygazeanalyser.edfreader import read_edf
+from pygazeanalyser.smireader import read_smioutput, SMIModes
 from pygazeanalyser.gazeplotter import draw_fixations, draw_heatmap, draw_scanpath, draw_raw
 
 # external
@@ -19,14 +20,14 @@ import numpy
 # CONSTANTS
 
 # PARTICIPANTS
-PPS = ['demo','demo2']
+PPS = ['1']
 
 # DIRECTORIES
 # paths
 DIR = os.path.dirname(__file__)
-IMGDIR = os.path.join(DIR, 'imgs')
-DATADIR = os.path.join(DIR, 'data')
+DATADIR = IMGDIR = os.path.join(DIR, 'imgs')
 PLOTDIR = os.path.join(DIR, 'plots')
+
 OUTPUTFILENAME = os.path.join(DIR, "output.txt")
 # check if the image directory exists
 if not os.path.isdir(IMGDIR):
@@ -40,28 +41,22 @@ if not os.path.isdir(PLOTDIR):
 
 # DATA FILES
 SEP = '\t' # value separator
-EDFSTART = "TRIALSTART" # EDF file trial start message
-EDFSTOP = "TRIALEND" # EDF file trial end message
-TRIALORDER = [EDFSTART, 'image online','image offline', EDFSTOP]
-INVALCODE = 0.0 # value coding invalid data
+START_TRIAL = None # file trial number start message
+STOP_TRIAL = None # file trial number end message
 
 # EXPERIMENT SPECS
-DISPSIZE = (1024,768) # (px,px)
+DISPSIZE = (1920,1080) # (px,px)
 SCREENSIZE = (39.9,29.9) # (cm,cm)
 SCREENDIST = 61.0 # cm
 PXPERCM = numpy.mean([DISPSIZE[0]/SCREENSIZE[0],DISPSIZE[1]/SCREENSIZE[1]]) # px/cm
 
-
 # # # # #
 # READ FILES
-
+# ---------
 # loop through all participants
 for ppname in PPS:
 	
 	print("starting data analysis for participant '%s'" % (ppname))
-
-	# BEHAVIOUR
-	print("loading behavioural data")
 	
 	# path
 	fp = os.path.join(DATADIR, '%s.txt' % ppname)
@@ -87,25 +82,10 @@ for ppname in PPS:
 	print("loading gaze data")
 	
 	# path
-	fp = os.path.join(DATADIR, '%s.asc' % ppname)
-	
-	# check if the path exist
-	if not os.path.isfile(fp):
-		# if not, check if the EDF exists
-		edfp = os.path.join(DATADIR, '%s.edf' % ppname)
-		if os.path.isfile(edfp):
-			# if it does, convert if usinf edf2asc.exe
-			os.system("edf2asc %s" % edfp)
-			# load ASCII
-			fp = os.path.join(DATADIR, '%s.asc' % ppname)
-		# if it does not exist, raise an exception
-		else:
-			raise Exception("No eye data file (neither ASC, nor EDF) file found for participant '%s' (tried paths:\nASC: %s\nEDF: %s" % (ppname, fp, edfp))
-	
+	fp = os.path.join(DATADIR, 'events.txt')
+
 	# read the file
-	# edfdata[trialnr]['time'] = list of timestamps in trialnr
-	# edfdata[trialnr]['size'] = list of pupil size samples in trialnr
-	edfdata = read_edf(fp, EDFSTART, stop=EDFSTOP, missing=INVALCODE, debug=False)
+	smidata = read_smioutput(fp, START_TRIAL, ag_mode=SMIModes.LEFT_ONLY, stop=STOP_TRIAL, debug=False)
 	
 	# NEW OUTPUT DIRECTORIES
 	# create a new output directory for the current participant
@@ -114,7 +94,6 @@ for ppname in PPS:
 	if not os.path.isdir(pplotdir):
 		# create it if it doesn't yet exist
 		os.mkdir(pplotdir)
-
 
 	# # # # #
 	# PLOTS
@@ -126,18 +105,19 @@ for ppname in PPS:
 		
 		# load image name, saccades, and fixations
 		imgname = data[trialnr][header.index("image")]
-		saccades = edfdata[trialnr]['events']['Esac'] # [starttime, endtime, duration, startx, starty, endx, endy]
-		fixations = edfdata[trialnr]['events']['Efix'] # [starttime, endtime, duration, endx, endy]
+		saccades = smidata[trialnr]['events']['Esac'] # [starttime, endtime, duration, startx, starty, endx, endy]
+		fixations = smidata[trialnr]['events']['Efix'] # [starttime, endtime, duration, endx, endy]
 		
 		# paths
-		imagefile = os.path.join(IMGDIR,imgname)
+		imagefile = os.path.join(IMGDIR, imgname)
+
 		rawplotfile = os.path.join(pplotdir, "raw_data_%s_%d" % (ppname,trialnr))
 		scatterfile = os.path.join(pplotdir, "fixations_%s_%d" % (ppname,trialnr))
 		scanpathfile =  os.path.join(pplotdir, "scanpath_%s_%d" % (ppname,trialnr))
 		heatmapfile = os.path.join(pplotdir, "heatmap_%s_%d" % (ppname,trialnr))
 		
 		# raw data points
-		draw_raw(edfdata[trialnr]['x'], edfdata[trialnr]['y'], DISPSIZE, imagefile=imagefile, savefilename=rawplotfile)
+		# draw_raw(smidata[trialnr]['x'], smidata[trialnr]['y'], DISPSIZE, imagefile=imagefile, savefilename=rawplotfile)
 
 		# fixations
 		draw_fixations(fixations, DISPSIZE, imagefile=imagefile, durationsize=True, durationcolour=False, alpha=0.5, savefilename=scatterfile)

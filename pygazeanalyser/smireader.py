@@ -388,8 +388,14 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
           event_type = line[0]
           m = None
           if re.match(r'^Fixation.*', event_type) is not None:
+            line[6] = float(line[6])
+            line[7] = float(line[7])
             append_line(line, fixs)
           elif re.match(r'^Saccade.*', event_type) is not None:
+            line[6] = float(line[6])
+            line[7] = float(line[7])
+            line[8] = float(line[8])
+            line[9] = float(line[9])
             append_line(line, sacs)
           elif re.match(r'^Blink.*', event_type) is not None:
             append_line(line, blks)
