@@ -71,7 +71,7 @@ COLS = {	"butter": [	'#fce94f',
 					'#2e3436'],
 		}
 # FONT
-FONT = {	'family': 'Ubuntu',
+FONT = {	'family': 'Arial',
 		'size': 12}
 matplotlib.rc('font', **FONT)
 
@@ -142,8 +142,8 @@ def draw_fixations(fixations, dispsize, imagefile=None, durationsize=True, durat
 	# save the figure if a file name was provided
 	if savefilename != None:
 		fig.savefig(savefilename)
-	
-	return fig
+
+	pyplot.close(fig)
 
 
 def draw_heatmap(fixations, dispsize, imagefile=None, durationweight=True, alpha=0.5, savefilename=None):
@@ -202,21 +202,23 @@ def draw_heatmap(fixations, dispsize, imagefile=None, durationweight=True, alpha
 		# get x and y coordinates
 		x = strt + fix['x'][i] - int(gwh/2)
 		y = strt + fix['y'][i] - int(gwh/2)
+
 		# correct Gaussian size if either coordinate falls outside of
 		# display boundaries
 		if (not 0 < x < dispsize[0]) or (not 0 < y < dispsize[1]):
 			hadj=[0,gwh];vadj=[0,gwh]
 			if 0 > x:
-				hadj[0] = abs(x)
+				hadj[0] = 0
 				x = 0
 			elif dispsize[0] < x:
 				hadj[1] = gwh - int(x-dispsize[0])
 			if 0 > y:
-				vadj[0] = abs(y)
+				vadj[0] = 0
 				y = 0
 			elif dispsize[1] < y:
 				vadj[1] = gwh - int(y-dispsize[1])
 			# add adjusted Gaussian to the current heatmap
+
 			heatmap[y:y+vadj[1],x:x+hadj[1]] += gaus[vadj[0]:vadj[1],hadj[0]:hadj[1]] * fix['dur'][i]
 		else:				
 			# add Gaussian to the current heatmap
@@ -236,7 +238,7 @@ def draw_heatmap(fixations, dispsize, imagefile=None, durationweight=True, alpha
 	if savefilename != None:
 		fig.savefig(savefilename)
 	
-	return fig
+	pyplot.close(fig)
 
 
 def draw_raw(x, y, dispsize, imagefile=None, savefilename=None):
@@ -280,7 +282,7 @@ def draw_raw(x, y, dispsize, imagefile=None, savefilename=None):
 	if savefilename != None:
 		fig.savefig(savefilename)
 	
-	return fig
+	pyplot.close(fig)
 
 
 def draw_scanpath(fixations, saccades, dispsize, imagefile=None, alpha=0.5, savefilename=None):
@@ -343,7 +345,7 @@ def draw_scanpath(fixations, saccades, dispsize, imagefile=None, alpha=0.5, save
 	if savefilename != None:
 		fig.savefig(savefilename)
 	
-	return fig
+	pyplot.close(fig)
 
 
 # # # # #
@@ -375,27 +377,40 @@ def draw_display(dispsize, imagefile=None):
 					if an imagefile was passed
 	"""
 	
+	print "Loading image: %s" % imagefile
+
 	# construct screen (black background)
 	screen = numpy.zeros((dispsize[1],dispsize[0],3), dtype='uint8')
+
 	# if an image location has been passed, draw the image
 	if imagefile != None:
 		# check if the path to the image exists
 		if not os.path.isfile(imagefile):
 			raise Exception("ERROR in draw_display: imagefile not found at '%s'" % imagefile)
+
 		# load image
 		img = image.imread(imagefile)
-		# flip image over the horizontal axis
-		# (do not do so on Windows, as the image appears to be loaded with
-		# the correct side up there; what's up with that? :/)
-		if not os.name == 'nt':
-			img = numpy.flipud(img)
+
+		if img.dtype == 'float32':
+			img = (img * 255).astype(numpy.uint8)
+
+		else:
+			# flip image over the horizontal axis
+			# (do not do so on Windows, as the image appears to be loaded with
+			# the correct side up there; what's up with that? :/)
+			if not os.name == 'nt':
+				img = numpy.flipud(img)
+
 		# width and height of the image
 		w, h = len(img[0]), len(img)
+
 		# x and y position of the image on the display
 		x = dispsize[0]/2 - w/2
 		y = dispsize[1]/2 - h/2
+
 		# draw the image on the screen
-		screen[y:y+h,x:x+w,:] += img
+		screen[y:y+h,x:x+w,:] = img
+
 	# dots per inch
 	dpi = 100.0
 	# determine the figure size in inches
