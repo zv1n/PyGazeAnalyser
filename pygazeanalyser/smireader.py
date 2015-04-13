@@ -360,11 +360,13 @@ def read_smioutput(filename, start=None, ag_mode=None, stop=None, debug=False):
       if start is None or start == trial_id:
         message("trialstart %d" % len(data))
         started = True
-        starttime = int(line[2])
+        starttime = int(line[3])
 
     line[3] = int(line[3]) - starttime
-    line[4] = int(line[4]) - starttime
+    line[4] = int(line[4]) - starttime 
     line[5] = int(line[5])
+
+    line[3:6] = [x/1000.0 for x in line[3:6]]
 
     # # # # #
     # parse line

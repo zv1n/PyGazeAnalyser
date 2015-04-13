@@ -126,4 +126,4 @@ for ppname in PPS:
 		draw_scanpath(fixations, saccades, DISPSIZE, imagefile=imagefile, alpha=0.5, savefilename=scanpathfile)
 
 		# heatmap		
-		draw_heatmap(fixations, DISPSIZE, imagefile=imagefile, durationweight=True, alpha=0.5, savefilename=heatmapfile)
+		draw_heatmap(fixations, DISPSIZE, imagefile=imagefile, durationweight=True, alpha=0.75, savefilename=heatmapfile)
